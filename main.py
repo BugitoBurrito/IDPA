@@ -1,70 +1,114 @@
-import pygame
-import os
+#!/usr/bin/env python3
 import RPi.GPIO as GPIO
+import pygame
 import time
+import os
+from threading import Thread
+
+# Initialize pygame mixer
+pygame.mixer.init()
+
+# Set GPIO mode
+GPIO.setmode(GPIO.BCM)
+GPIO.setwarnings(False)
+
+# Define GPIO pins for notes
+NOTE_PINS = {
+    22: "B",
+    23: "Bb",
+    24: "A",
+    10: "Ab",
+    9: "G",
+    25: "Gb",
+    11: "F",
+    8: "E",
+    # Note: Eb missing GPIO assignment in the Excel file
+    0: "D",
+    1: "Db",
+    5: "C"
+}
+
+# Define GPIO pins for octaves
+OCTAVE_PINS = {
+    2: 1,  # GPIO 2 for Octave 1
+    3: 2,  # GPIO 3 for Octave 2
+    4: 3,  # GPIO 4 for Octave 3
+    14: 4,  # GPIO 14 for Octave 4
+    15: 5,  # GPIO 15 for Octave 5
+    17: 6,  # GPIO 17 for Octave 6
+    18: 7,  # GPIO 18 for Octave 7
+}
+
+# Default octave
+current_octave = 1
+
+# Setup GPIO pins as inputs with pull-down resistors
+for pin in NOTE_PINS.keys():
+    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+
+for pin in OCTAVE_PINS.keys():
+    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 
 
-def play_sound(sound_file):
+# Sound player function
+def play_sound(octave, note):
+    sound_path = f"Oktave {octave}/sound_okatve{octave}_{note}.mp3"
+    print(f"Playing: {sound_path}")
+
+    # Check if file exists
+    if not os.path.exists(sound_path):
+        print(f"Error: Sound file not found: {sound_path}")
+        return
+
     try:
-        # Initialize pygame mixer
-        pygame.mixer.init()
-
-        # Check if file exists
-        if not os.path.exists(sound_file):
-            print(f"Error: File '{sound_file}' not found")
-            return False
+        # Stop any currently playing sounds
+        pygame.mixer.music.stop()
 
         # Load and play the sound
-        pygame.mixer.music.load(sound_file)
+        pygame.mixer.music.load(sound_path)
         pygame.mixer.music.play()
-
-        # Wait for the sound to finish playing
-        while pygame.mixer.music.get_busy():
-            pygame.time.Clock().tick(10)
-
     except Exception as e:
-        print(f"Error playing sound: {str(e)}")
-        return False
-    finally:
-        pygame.mixer.quit()
-
-    return True
+        print(f"Error playing sound: {e}")
 
 
-if __name__ == "__main__":
-    # GPIO Setup mit BOARD-Nummerierung
-    GPIO.setmode(GPIO.BOARD)
-    GPIO_PIN = 3  # Physischer Pin 3 entspricht GPIO2
-    GPIO.setup(GPIO_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+# GPIO event callbacks
+def note_callback(channel):
+    global current_octave
+    note = NOTE_PINS[channel]
 
-    # Pfad zur Sound-Datei
-    sound_file = os.path.join("okatve", "sound_okatve1_A.mp3")
+    # Create a new thread to play the sound
+    sound_thread = Thread(target=play_sound, args=(current_octave, note))
+    sound_thread.daemon = True
+    sound_thread.start()
 
-    # Speichern des vorherigen Zustands für die Flankenerkennung
-    previous_state = GPIO.input(GPIO_PIN)
 
-    print("Programm gestartet. Warte auf GPIO-Eingabe (Pin 3)...")
+def octave_callback(channel):
+    global current_octave
+    current_octave = OCTAVE_PINS[channel]
+    print(f"Switched to Octave {current_octave}")
 
-    try:
-        while True:
-            # Aktuellen Zustand lesen
-            current_state = GPIO.input(GPIO_PIN)
 
-            # Debug-Ausgabe
-            print(f"Aktueller Zustand: {current_state}")
+# Add event detection for all pins (only trigger on rising edge)
+for pin in NOTE_PINS.keys():
+    GPIO.add_event_detect(pin, GPIO.RISING, callback=note_callback, bouncetime=300)
 
-            # Positive Flanke erkennen (Wechsel von 0 auf 1)
-            if current_state == 1 and previous_state == 0:
-                print("Positive Flanke erkannt! Spiele Sound...")
-                play_sound(sound_file)
+for pin in OCTAVE_PINS.keys():
+    GPIO.add_event_detect(pin, GPIO.RISING, callback=octave_callback, bouncetime=300)
 
-            # Aktuellen Zustand für den nächsten Durchlauf speichern
-            previous_state = current_state
+# Main program
+try:
+    print("GPIO Sound Player Running...")
+    print(f"Current Octave: {current_octave}")
+    print("Press Ctrl+C to exit")
 
-            # Kurze Pause, um CPU-Last zu reduzieren
-            time.sleep(0.5)
+    # Keep the program running
+    while True:
+        time.sleep(1)
 
-    except KeyboardInterrupt:
-        print("Programm durch Benutzer beendet.")
-    finally:
-        GPIO.cleanup()
+except KeyboardInterrupt:
+    print("\nExiting program")
+
+finally:
+    # Clean up GPIO on exit
+    GPIO.cleanup()
+    pygame.mixer.quit()
