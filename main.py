@@ -105,11 +105,20 @@ def octave_callback(channel):
 
 
 # Add event detection for all pins (only trigger on rising edge)
-for pin in NOTE_PINS.keys():
-    GPIO.add_event_detect(pin, GPIO.RISING, callback=note_callback, bouncetime=300)
+try:
+    # Make sure all pins are set up first
+    for pin in NOTE_PINS.keys():
+        # Double-check input setup
+        GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+        GPIO.add_event_detect(pin, GPIO.RISING, callback=note_callback, bouncetime=300)
 
-for pin in OCTAVE_PINS.keys():
-    GPIO.add_event_detect(pin, GPIO.RISING, callback=octave_callback, bouncetime=300)
+    for pin in OCTAVE_PINS.keys():
+        # Double-check input setup
+        GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+        GPIO.add_event_detect(pin, GPIO.RISING, callback=octave_callback, bouncetime=300)
+except Exception as e:
+    print(f"Error setting up event detection: {e}")
+    print("Make sure all GPIO pins are properly configured as inputs.")
 
 # Main program
 try:
