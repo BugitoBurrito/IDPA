@@ -5,8 +5,8 @@ import sys
 
 # Define GPIO pins for notes
 NOTE_PINS = {
-    22: "B",
-    23: "Bb",
+    22: "Bb",  # Corrected - GPIO 22 is Bb
+    23: "B",  # Corrected - GPIO 23 is B
     24: "A",
     10: "Ab",
     9: "G",
@@ -53,17 +53,20 @@ try:
     # Set up all pins and track their initial states
     all_pins = list(NOTE_PINS.keys()) + list(OCTAVE_PINS.keys())
     for pin in all_pins:
-        # Set up as input with pull-down
-        lgpio.gpio_claim_input(h, pin, lgpio.SET_PULL_DOWN)
+        try:
+            # Set up as input with pull-down
+            lgpio.gpio_claim_input(h, pin, lgpio.SET_PULL_DOWN)
 
-        # Store initial state
-        previous_states[pin] = lgpio.gpio_read(h, pin)
+            # Store initial state
+            previous_states[pin] = lgpio.gpio_read(h, pin)
 
-        # Print setup info
-        if pin in NOTE_PINS:
-            print(f"  Set up note pin GPIO {pin} ({NOTE_PINS[pin]})")
-        else:
-            print(f"  Set up octave pin GPIO {pin} (Octave {OCTAVE_PINS[pin]})")
+            # Print setup info
+            if pin in NOTE_PINS:
+                print(f"  Set up note pin GPIO {pin} ({NOTE_PINS[pin]})")
+            else:
+                print(f"  Set up octave pin GPIO {pin} (Octave {OCTAVE_PINS[pin]})")
+        except Exception as e:
+            print(f"  Error setting up GPIO {pin}: {e}")
 
 except Exception as e:
     print(f"Error setting up GPIO: {e}")
@@ -81,20 +84,30 @@ try:
     while True:
         # Check all pins for state changes
         for pin in all_pins:
-            current_state = lgpio.gpio_read(h, pin)
+            try:
+                current_state = lgpio.gpio_read(h, pin)
 
-            # Check for rising edge (0 to 1)
-            if current_state == 1 and previous_states[pin] == 0:
-                if pin in NOTE_PINS:
-                    note = NOTE_PINS[pin]
-                    print(f"NOTE PRESSED: {note} (GPIO {pin})")
-                    print(f"Would play: Oktave {current_octave}/sound_okatve{current_octave}_{note}.mp3")
-                elif pin in OCTAVE_PINS:
-                    current_octave = OCTAVE_PINS[pin]
-                    print(f"OCTAVE CHANGED: Now using Octave {current_octave} (GPIO {pin})")
+                # Check for rising edge (0 to 1)
+                if current_state == 1 and previous_states[pin] == 0:
+                    if pin in NOTE_PINS:
+                        note = NOTE_PINS[pin]
+                        print(f"NOTE PRESSED: {note} (GPIO {pin})")
+                        print(f"Would play: Oktave {current_octave}/sound_okatve{current_octave}_{note}.mp3")
+                    elif pin in OCTAVE_PINS:
+                        current_octave = OCTAVE_PINS[pin]
+                        print(f"OCTAVE CHANGED: Now using Octave {current_octave} (GPIO {pin})")
+                        # Force print a message for Octave 1 and 2 (GPIOs 2 and 3)
+                        if pin == 2:
+                            print(f"Octave 1 selected (GPIO 2)")
+                        elif pin == 3:
+                            print(f"Octave 2 selected (GPIO 3)")
 
-            # Update previous state
-            previous_states[pin] = current_state
+                # Update previous state
+                previous_states[pin] = current_state
+            except Exception as e:
+                print(f"Error reading GPIO {pin}: {e}")
+                # Prevent repeated error messages
+                time.sleep(1)
 
         # Short delay to avoid high CPU usage
         time.sleep(0.01)
