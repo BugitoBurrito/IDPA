@@ -1,21 +1,4 @@
-# Special handling for Octave 1 and 2 (GPIO 2 and 3)
-print("\nApplying special configuration for Octave 1 and 2...")
-try:
-    # Force stronger pull-down for GPIO 2 (Octave 1)
-    if 2 in OCTAVE_PINS:
-        # Release and reclaim with explicit pull-down
-        lgpio.gpio_free(h, 2)
-        lgpio.gpio_claim_input(h, 2, lgpio.SET_PULL_DOWN)
-        print("  Applied strong pull-down for GPIO 2 (Octave 1)")
-
-    # Force stronger pull-down for GPIO 3 (Octave 2)
-    if 3 in OCTAVE_PINS:
-        # Release and reclaim with explicit pull-down
-        lgpio.gpio_free(h, 3)
-        lgpio.gpio_claim_input(h, 3, lgpio.SET_PULL_DOWN)
-        print("  Applied strong pull-down for GPIO 3 (Octave 2)")
-except Exception as e:
-    print(f"  Error applying special configuration: {e}")  # !/usr/bin/env python3
+#!/usr/bin/env python3
 import lgpio
 import time
 import sys
@@ -38,13 +21,13 @@ NOTE_PINS = {
 
 # Define GPIO pins for octaves
 OCTAVE_PINS = {
-    2: 1,  # GPIO 2 for Octave 1
-    3: 2,  # GPIO 3 for Octave 2
+    19: 1,  # GPIO 19 for Octave 1 (updated)
+    26: 2,  # GPIO 26 for Octave 2 (updated)
     4: 3,  # GPIO 4 for Octave 3
     14: 4,  # GPIO 14 for Octave 4
     15: 5,  # GPIO 15 for Octave 5
     17: 6,  # GPIO 17 for Octave 6
-    18: 7,  # GPIO 18 for Octave 7
+    18: 7  # GPIO 18 for Octave 7
 }
 
 # Initialize lgpio and open the chip
@@ -113,11 +96,6 @@ try:
                     elif pin in OCTAVE_PINS:
                         current_octave = OCTAVE_PINS[pin]
                         print(f"OCTAVE CHANGED: Now using Octave {current_octave} (GPIO {pin})")
-                        # Force print a message for Octave 1 and 2 (GPIOs 2 and 3)
-                        if pin == 2:
-                            print(f"Octave 1 selected (GPIO 2)")
-                        elif pin == 3:
-                            print(f"Octave 2 selected (GPIO 3)")
 
                 # Update previous state
                 previous_states[pin] = current_state
