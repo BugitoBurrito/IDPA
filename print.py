@@ -1,17 +1,7 @@
 #!/usr/bin/env python3
-import RPi.GPIO as GPIO
+import lgpio as GPIO
 import time
 import sys
-
-# Set GPIO mode with error handling
-try:
-    GPIO.setmode(GPIO.BCM)
-    GPIO.setwarnings(False)
-    print("GPIO initialized successfully")
-except Exception as e:
-    print(f"GPIO initialization error: {e}")
-    print("Make sure you're running with sudo")
-    sys.exit(1)
 
 # Define GPIO pins for notes
 NOTE_PINS = {
@@ -31,51 +21,52 @@ NOTE_PINS = {
 
 # Define GPIO pins for octaves
 OCTAVE_PINS = {
-    2: 1,  # GPIO 2 for Octave 1
-    3: 2,  # GPIO 3 for Octave 2
-    4: 3,  # GPIO 4 for Octave 3
-    14: 4,  # GPIO 14 for Octave 4
-    15: 5,  # GPIO 15 for Octave 5
-    17: 6,  # GPIO 17 for Octave 6
-    18: 7,  # GPIO 18 for Octave 7
+    2: 1,
+    3: 2,
+    4: 3,
+    14: 4,
+    15: 5,
+    17: 6,
+    18: 7,
 }
 
 # Current octave
 current_octave = 1
 
 
-# GPIO event callbacks
-def note_callback(channel):
-    note = NOTE_PINS[channel]
-    print(f"NOTE PRESSED: {note} (GPIO {channel})")
-    print(f"Would play: Oktave {current_octave}/sound_okatve{current_octave}_{note}.mp3")
+def note_callback(chip, gpio, level, timestamp):
+    if level == 1:
+        note = NOTE_PINS.get(gpio, "Unknown")
+        print(f"NOTE PRESSED: {note} (GPIO {gpio})")
+        print(f"Would play: Oktave {current_octave}/sound_okatve{current_octave}_{note}.mp3")
 
 
-def octave_callback(channel):
+def octave_callback(chip, gpio, level, timestamp):
     global current_octave
-    current_octave = OCTAVE_PINS[channel]
-    print(f"OCTAVE CHANGED: Now using Octave {current_octave} (GPIO {channel})")
+    if level == 1:
+        current_octave = OCTAVE_PINS.get(gpio, current_octave)
+        print(f"OCTAVE CHANGED: Now using Octave {current_octave} (GPIO {gpio})")
 
 
-# Setup GPIO pins and event detection
+# Setup GPIO
 try:
+    chip = GPIO.GPIOChip(0)  # Access GPIO chip
     print("Setting up GPIO pins...")
 
     # Set up note pins
     for pin in NOTE_PINS.keys():
-        GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-        GPIO.add_event_detect(pin, GPIO.RISING, callback=note_callback, bouncetime=300)
+        chip.request(pin, GPIO.INPUT, GPIO.BIAS_PULL_DOWN)
+        chip.callback(pin, GPIO.RISING_EDGE, note_callback)
         print(f"  Set up note pin GPIO {pin} ({NOTE_PINS[pin]})")
 
     # Set up octave pins
     for pin in OCTAVE_PINS.keys():
-        GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-        GPIO.add_event_detect(pin, GPIO.RISING, callback=octave_callback, bouncetime=300)
+        chip.request(pin, GPIO.INPUT, GPIO.BIAS_PULL_DOWN)
+        chip.callback(pin, GPIO.RISING_EDGE, octave_callback)
         print(f"  Set up octave pin GPIO {pin} (Octave {OCTAVE_PINS[pin]})")
 
 except Exception as e:
     print(f"Error setting up GPIO: {e}")
-    GPIO.cleanup()
     sys.exit(1)
 
 # Main program
@@ -85,7 +76,6 @@ print("Current octave: 1")
 print("Press Ctrl+C to exit")
 
 try:
-    # Keep the program running
     while True:
         time.sleep(0.1)
 
@@ -93,6 +83,5 @@ except KeyboardInterrupt:
     print("\nTest program exited")
 
 finally:
-    # Clean up GPIO on exit
-    GPIO.cleanup()
+    chip.close()
     print("GPIO cleaned up")
