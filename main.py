@@ -3,10 +3,69 @@ import RPi.GPIO as GPIO
 import pygame
 import time
 import os
+import sys
 from threading import Thread
 
-# Initialize pygame mixer
-pygame.mixer.init()
+# Make sure pygame is installed
+try:
+    pygame.init()
+    pygame.quit()  # Immediately quit to avoid resource issues
+except ImportError:
+    print("Pygame not installed. Please install with:")
+    print("sudo pip3 install pygame")
+    sys.exit(1)
+
+# Check for Raspberry Pi 5
+import platform
+import subprocess
+
+
+def is_raspberry_pi_5():
+    try:
+        with open('/proc/device-tree/model', 'r') as f:
+            model = f.read()
+            return 'Raspberry Pi 5' in model
+    except:
+        return False
+
+
+is_pi5 = is_raspberry_pi_5()
+if is_pi5:
+    print("Detected Raspberry Pi 5")
+    # Pi 5 may need different audio configuration
+    try:
+        # Check if audio is configured
+        subprocess.run(['amixer'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print("Audio system detected")
+    except:
+        print("Note: You may need to configure audio output with:")
+        print("sudo raspi-config")
+        print("Navigate to System Options -> Audio -> and select your preferred output")
+
+# Initialize pygame mixer with error handling
+try:
+    # Pi 5 often works better with these settings
+    if is_pi5:
+        pygame.mixer.init(48000, -16, 2, 4096)
+        print("Audio initialized with Pi 5 optimized settings")
+    else:
+        pygame.mixer.init(44100, -16, 2, 2048)
+        print("Audio initialized successfully")
+except Exception as e:
+    print(f"Error initializing audio: {e}")
+    print("Trying alternative audio initialization...")
+    try:
+        # Try with different frequency
+        pygame.mixer.init(48000, -16, 1, 4096)
+        print("Audio initialized with alternative parameters")
+    except Exception as e:
+        print(f"Alternative audio initialization failed: {e}")
+        print("Audio playback may not be available.")
+        print("For Raspberry Pi 5, try these steps:")
+        print("1. Run 'sudo raspi-config'")
+        print("2. Go to System Options -> Audio")
+        print("3. Select your preferred output device")
+        print("4. Reboot the Pi")
 
 # Set GPIO mode and fix for "Cannot determine SOC peripheral base address" error
 try:
@@ -34,7 +93,7 @@ NOTE_PINS = {
     25: "Gb",
     11: "F",
     8: "E",
-    # Note: Eb missing GPIO assignment in the Excel file
+    7: "Eb",  # Added Eb on GPIO 7
     0: "D",
     1: "Db",
     5: "C"
@@ -77,14 +136,27 @@ def play_sound(octave, note):
         return
 
     try:
+        # Check if mixer is initialized
+        if not pygame.mixer.get_init():
+            print("Mixer not initialized, attempting to reinitialize...")
+            try:
+                pygame.mixer.init(44100, -16, 2, 2048)
+            except:
+                print("Failed to initialize audio again.")
+                return
+
         # Stop any currently playing sounds
         pygame.mixer.music.stop()
 
         # Load and play the sound
         pygame.mixer.music.load(sound_path)
         pygame.mixer.music.play()
+
+        print(f"Successfully started playback of {sound_path}")
     except Exception as e:
         print(f"Error playing sound: {e}")
+        print("Try running: 'sudo amixer cset numid=3 1' to set audio to headphone jack")
+        print("Or 'sudo amixer cset numid=3 2' to set audio to HDMI")
 
 
 # GPIO event callbacks
