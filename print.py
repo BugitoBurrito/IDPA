@@ -50,23 +50,25 @@ def octave_callback(chip, gpio, level, timestamp):
 
 # Setup GPIO
 try:
-    chip = GPIO.GPIOChip(0)  # Access GPIO chip
+    chip = GPIO.open(0)  # Open GPIO chip 0
     print("Setting up GPIO pins...")
 
     # Set up note pins
     for pin in NOTE_PINS.keys():
-        chip.request(pin, GPIO.INPUT, GPIO.BIAS_PULL_DOWN)
-        chip.callback(pin, GPIO.RISING_EDGE, note_callback)
+        GPIO.set_mode(chip, pin, GPIO.INPUT)
+        GPIO.set_pull_up_down(chip, pin, GPIO.PULL_DOWN)
+        GPIO.callback(chip, pin, GPIO.RISING_EDGE, note_callback)
         print(f"  Set up note pin GPIO {pin} ({NOTE_PINS[pin]})")
 
     # Set up octave pins
     for pin in OCTAVE_PINS.keys():
-        chip.request(pin, GPIO.INPUT, GPIO.BIAS_PULL_DOWN)
-        chip.callback(pin, GPIO.RISING_EDGE, octave_callback)
+        GPIO.set_mode(chip, pin, GPIO.INPUT)
+        GPIO.set_pull_up_down(chip, pin, GPIO.PULL_DOWN)
+        GPIO.callback(chip, pin, GPIO.RISING_EDGE, octave_callback)
         print(f"  Set up octave pin GPIO {pin} (Octave {OCTAVE_PINS[pin]})")
 
 except Exception as e:
-    print(f"Error setting up GPIO: {e}")
+    print(f"Error setting up GPIO module: {e}")
     sys.exit(1)
 
 # Main program
@@ -83,5 +85,5 @@ except KeyboardInterrupt:
     print("\nTest program exited")
 
 finally:
-    chip.close()
+    GPIO.close(chip)
     print("GPIO cleaned up")
