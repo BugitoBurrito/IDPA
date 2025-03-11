@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import lgpio as GPIO
+import lgpio
 import time
 import sys
 
@@ -21,69 +21,88 @@ NOTE_PINS = {
 
 # Define GPIO pins for octaves
 OCTAVE_PINS = {
-    2: 1,
-    3: 2,
-    4: 3,
-    14: 4,
-    15: 5,
-    17: 6,
-    18: 7,
+    2: 1,  # GPIO 2 for Octave 1
+    3: 2,  # GPIO 3 for Octave 2
+    4: 3,  # GPIO 4 for Octave 3
+    14: 4,  # GPIO 14 for Octave 4
+    15: 5,  # GPIO 15 for Octave 5
+    17: 6,  # GPIO 17 for Octave 6
+    18: 7,  # GPIO 18 for Octave 7
 }
+
+# Initialize lgpio and open the chip
+try:
+    h = lgpio.gpiochip_open(0)  # Open GPIO chip 0 (Raspberry Pi's main GPIO chip)
+    print("LGPIO initialized successfully")
+except Exception as e:
+    print(f"LGPIO initialization error: {e}")
+    print("Make sure lgpio is installed: sudo apt install python3-lgpio")
+    print("Make sure you're running with sudo")
+    sys.exit(1)
 
 # Current octave
 current_octave = 1
 
+# Store previous GPIO states to detect changes
+previous_states = {}
 
-def note_callback(chip, gpio, level, timestamp):
-    if level == 1:
-        note = NOTE_PINS.get(gpio, "Unknown")
-        print(f"NOTE PRESSED: {note} (GPIO {gpio})")
-        print(f"Would play: Oktave {current_octave}/sound_okatve{current_octave}_{note}.mp3")
-
-
-def octave_callback(chip, gpio, level, timestamp):
-    global current_octave
-    if level == 1:
-        current_octave = OCTAVE_PINS.get(gpio, current_octave)
-        print(f"OCTAVE CHANGED: Now using Octave {current_octave} (GPIO {gpio})")
-
-
-# Setup GPIO
+# Setup GPIO pins as inputs with pull-down resistors
 try:
-    chip = GPIO.open(0)  # Open GPIO chip 0
     print("Setting up GPIO pins...")
 
-    # Set up note pins
-    for pin in NOTE_PINS.keys():
-        GPIO.set_mode(chip, pin, GPIO.INPUT)
-        GPIO.set_pull_up_down(chip, pin, GPIO.PULL_DOWN)
-        GPIO.callback(chip, pin, GPIO.RISING_EDGE, note_callback)
-        print(f"  Set up note pin GPIO {pin} ({NOTE_PINS[pin]})")
+    # Set up all pins and track their initial states
+    all_pins = list(NOTE_PINS.keys()) + list(OCTAVE_PINS.keys())
+    for pin in all_pins:
+        # Set up as input with pull-down
+        lgpio.gpio_claim_input(h, pin, lgpio.SET_PULL_DOWN)
 
-    # Set up octave pins
-    for pin in OCTAVE_PINS.keys():
-        GPIO.set_mode(chip, pin, GPIO.INPUT)
-        GPIO.set_pull_up_down(chip, pin, GPIO.PULL_DOWN)
-        GPIO.callback(chip, pin, GPIO.RISING_EDGE, octave_callback)
-        print(f"  Set up octave pin GPIO {pin} (Octave {OCTAVE_PINS[pin]})")
+        # Store initial state
+        previous_states[pin] = lgpio.gpio_read(h, pin)
+
+        # Print setup info
+        if pin in NOTE_PINS:
+            print(f"  Set up note pin GPIO {pin} ({NOTE_PINS[pin]})")
+        else:
+            print(f"  Set up octave pin GPIO {pin} (Octave {OCTAVE_PINS[pin]})")
 
 except Exception as e:
-    print(f"Error setting up GPIO module: {e}")
+    print(f"Error setting up GPIO: {e}")
+    lgpio.gpiochip_close(h)
     sys.exit(1)
 
 # Main program
-print("\n--- GPIO Piano Test Program ---")
+print("\n--- LGPIO Piano Test Program ---")
 print("Press GPIO buttons to see which notes and octaves are detected")
 print("Current octave: 1")
 print("Press Ctrl+C to exit")
 
 try:
+    # Keep the program running
     while True:
-        time.sleep(0.1)
+        # Check all pins for state changes
+        for pin in all_pins:
+            current_state = lgpio.gpio_read(h, pin)
+
+            # Check for rising edge (0 to 1)
+            if current_state == 1 and previous_states[pin] == 0:
+                if pin in NOTE_PINS:
+                    note = NOTE_PINS[pin]
+                    print(f"NOTE PRESSED: {note} (GPIO {pin})")
+                    print(f"Would play: Oktave {current_octave}/sound_okatve{current_octave}_{note}.mp3")
+                elif pin in OCTAVE_PINS:
+                    current_octave = OCTAVE_PINS[pin]
+                    print(f"OCTAVE CHANGED: Now using Octave {current_octave} (GPIO {pin})")
+
+            # Update previous state
+            previous_states[pin] = current_state
+
+        # Short delay to avoid high CPU usage
+        time.sleep(0.01)
 
 except KeyboardInterrupt:
     print("\nTest program exited")
 
 finally:
-    GPIO.close(chip)
+    # Clean up LGPIO on exit
+    lgpio.gpiochip_close(h)
     print("GPIO cleaned up")
