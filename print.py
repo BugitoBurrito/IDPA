@@ -1,4 +1,21 @@
-#!/usr/bin/env python3
+# Special handling for Octave 1 and 2 (GPIO 2 and 3)
+print("\nApplying special configuration for Octave 1 and 2...")
+try:
+    # Force stronger pull-down for GPIO 2 (Octave 1)
+    if 2 in OCTAVE_PINS:
+        # Release and reclaim with explicit pull-down
+        lgpio.gpio_free(h, 2)
+        lgpio.gpio_claim_input(h, 2, lgpio.SET_PULL_DOWN)
+        print("  Applied strong pull-down for GPIO 2 (Octave 1)")
+
+    # Force stronger pull-down for GPIO 3 (Octave 2)
+    if 3 in OCTAVE_PINS:
+        # Release and reclaim with explicit pull-down
+        lgpio.gpio_free(h, 3)
+        lgpio.gpio_claim_input(h, 3, lgpio.SET_PULL_DOWN)
+        print("  Applied strong pull-down for GPIO 3 (Octave 2)")
+except Exception as e:
+    print(f"  Error applying special configuration: {e}")  # !/usr/bin/env python3
 import lgpio
 import time
 import sys
