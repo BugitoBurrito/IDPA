@@ -8,9 +8,21 @@ from threading import Thread
 # Initialize pygame mixer
 pygame.mixer.init()
 
-# Set GPIO mode
-GPIO.setmode(GPIO.BCM)
-GPIO.setwarnings(False)
+# Set GPIO mode and fix for "Cannot determine SOC peripheral base address" error
+try:
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setwarnings(False)
+except Exception as e:
+    print(f"GPIO initialization error: {e}")
+    print("Attempting alternative initialization...")
+    # Try with explicit hardware configuration
+    import os
+
+    os.environ['GPIOZERO_PIN_FACTORY'] = 'mock'
+    # Alternative for RPi.GPIO
+    # If you're running this on a specific Pi model, you might need to set:
+    # GPIO.setmode(GPIO.BCM)
+    # GPIO.setup(...)
 
 # Define GPIO pins for notes
 NOTE_PINS = {
@@ -43,11 +55,15 @@ OCTAVE_PINS = {
 current_octave = 1
 
 # Setup GPIO pins as inputs with pull-down resistors
-for pin in NOTE_PINS.keys():
-    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+try:
+    for pin in NOTE_PINS.keys():
+        GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 
-for pin in OCTAVE_PINS.keys():
-    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+    for pin in OCTAVE_PINS.keys():
+        GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+except Exception as e:
+    print(f"Failed to setup GPIO pins: {e}")
+    print("If you're running on a Pi, make sure you're running as root (sudo) or have proper permissions.")
 
 
 # Sound player function
